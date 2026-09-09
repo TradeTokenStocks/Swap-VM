@@ -24,7 +24,7 @@ import { PiecewiseLinearScaleBalanceIn, PiecewiseLinearScaleBalanceOut, Piecewis
 import { BaseFeeAdjuster } from "../src/instructions/BaseFeeAdjuster.sol";
 import { Stop, Revert, Deadline, Salt } from "../src/instructions/Controls.sol";
 import { Jump, JumpIfDirection, JumpIfTokenIn, JumpIfTokenOut } from "../src/instructions/Jumps.sol";
-import { OnlyTakerTokenBalanceNonZero, OnlyTakerTokenBalanceGte, OnlyTakerTokenSupplyShareGte, OnlyTxOriginTokenBalanceNonZero } from "../src/instructions/TokenValidators.sol";
+import { OnlyTakerTokenBalanceNonZero, OnlyTakerTokenSupplyShareGte, OnlyTxOriginTokenBalanceNonZero,CheckStockMultiplierRange } from "../src/instructions/TokenValidators.sol";
 import { RequireMinRate, AdjustMinRate } from "../src/instructions/MinRate.sol";
 import { FeeFlatIn, FeeFlatOut } from "../src/instructions/FeeFlat.sol";
 import { PatchSwapRegisters } from "../src/instructions/Debug.sol";
@@ -225,7 +225,7 @@ contract GasSnapshotE2E is Script {
     function _vmProgramJustOnlyTakerTokenBalanceGte() internal view returns (bytes memory) {
         return bytes.concat(
             PatchSwapRegisters.build(SwapRegisters({balanceIn: AMOUNT, balanceOut: AMOUNT, amountIn: AMOUNT, amountOut: AMOUNT})),
-            OnlyTakerTokenBalanceGte.build(address(tokenA), 1)
+            CheckStockMultiplierRange.build(address(tokenA), 1e17, 2e18)
         );
     }
 

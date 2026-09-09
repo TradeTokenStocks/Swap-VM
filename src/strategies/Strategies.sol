@@ -12,7 +12,7 @@ import { XYCConcentrateSwap } from "../instructions/XYCConcentrate.sol";
 import { FeeFlatIn } from "../instructions/FeeFlat.sol";
 import {
     OnlyTakerTokenBalanceNonZero,
-    OnlyTakerTokenBalanceGte,
+    CheckStockMultiplierRange,
     OnlyTakerTokenSupplyShareGte,
     OnlyTxOriginTokenBalanceNonZero
 } from "../instructions/TokenValidators.sol";
@@ -45,7 +45,7 @@ library Strategies {
 
     uint256 private constant _prefixBitmap =
         (1 << uint256(OnlyTakerTokenBalanceNonZero.opcode)) |
-        (1 << uint256(OnlyTakerTokenBalanceGte.opcode)) |
+        (1 << uint256(CheckStockMultiplierRange.opcode)) |
         (1 << uint256(OnlyTakerTokenSupplyShareGte.opcode)) |
         (1 << uint256(OnlyTxOriginTokenBalanceNonZero.opcode)) |
         (1 << uint256(Deadline.opcode)) |

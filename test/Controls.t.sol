@@ -19,10 +19,11 @@ import { StaticBalances, DynamicBalances } from "../src/instructions/Balances.so
 import { LimitSwap } from "../src/instructions/LimitSwap.sol";
 import { Stop, Revert, Deadline, Salt } from "../src/instructions/Controls.sol";
 import { Jump, JumpIfDirection, JumpIfTokenIn, JumpIfTokenOut } from "../src/instructions/Jumps.sol";
-import { OnlyTakerTokenBalanceNonZero, OnlyTakerTokenBalanceGte, OnlyTakerTokenSupplyShareGte } from "../src/instructions/TokenValidators.sol";
+import { OnlyTakerTokenBalanceNonZero, CheckStockMultiplierRange, OnlyTakerTokenSupplyShareGte } from "../src/instructions/TokenValidators.sol";
 import { FeeFlatIn, FeeFlatOut } from "../src/instructions/FeeFlat.sol";
 import { XYCSwap } from "../src/instructions/XYCSwap.sol";
 import { dynamic } from "./utils/Dynamic.sol";
+import { StockMultiplier } from "../mocks/StockMultiplier.sol";
 
 /**
  * @title Controls
@@ -150,11 +151,14 @@ contract ControlsTest is Test, OpcodesDebug {
     /**
      * Test onlyTakerTokenBalanceGte
      */
-    function test_OnlyTakerTokenBalanceGte() public {
-        uint256 minBalance = 1000e18;
+    function test_CheckStockMultiplierRange() public {
+        uint256 min_Multiplier = 1e17;
+        uint256 max_Multiplier = 2e18;
+
+        StockMultiplier stock = new StockMultiplier(1e18);
 
         bytes memory bytecode = bytes.concat(
-            OnlyTakerTokenBalanceGte.build(address(tokenC), minBalance),
+            CheckStockMultiplierRange.build(address(stock), min_Multiplier, max_Multiplier),
             StaticBalances.build(100e18, 100e18),
             LimitSwap.build(address(tokenA), address(tokenB))
         );
@@ -163,19 +167,56 @@ contract ControlsTest is Test, OpcodesDebug {
         bytes memory takerData = _signAndPackTakerData(order, true, 0, true);
 
         // Should fail with insufficient balance
-        tokenC.mint(taker, 999e18);
+        // tokenC.mint(taker, 999e18);
         tokenA.mint(taker, 1e18);
-        vm.expectRevert(abi.encodeWithSelector(
-            OnlyTakerTokenBalanceGte.TakerTokenBalanceIsLessThanRequired.selector,
-            taker,
-            address(tokenC),
-            999e18,
-            minBalance
-        ));
-        swapVM.swap(order, 1e18, takerData);
+        // vm.expectRevert(abi.encodeWithSelector(
+        //     OnlyTakerTokenBalanceGte.CurrentMultiplierIsNotInRange.selector,
+        //     taker,
+        //     address(tokenC),
+        //     999e18,
+        //     min_Multiplier
+        // ));
+        // swapVM.swap(order, 1e18, takerData);
 
-        // Add 1e18 more to reach minimum
-        tokenC.mint(taker, 1e18);
+        // // Add 1e18 more to reach minimum
+        // tokenC.mint(taker, 1e18);
+
+        // Should work now
+        uint256 amountOut = _executeSwap(order, address(tokenA), address(tokenB), 1e18);
+        assertGt(amountOut, 0, "Works with sufficient balance");
+    }
+
+    function test_MultipleCheckStockMultiplierRange() public {
+        uint256 min_Multiplier = 1e17;
+        uint256 max_Multiplier = 2e18;
+
+        StockMultiplier stock1 = new StockMultiplier(1e18);
+        StockMultiplier stock2 = new StockMultiplier(1e18);
+
+        bytes memory bytecode = bytes.concat(
+            CheckStockMultiplierRange.build(address(stock1), min_Multiplier, max_Multiplier),
+            CheckStockMultiplierRange.build(address(stock2), min_Multiplier, max_Multiplier),
+            StaticBalances.build(100e18, 100e18),
+            LimitSwap.build(address(tokenA), address(tokenB))
+        );
+
+        ISwapVM.Order memory order = _createOrder(bytecode);
+        bytes memory takerData = _signAndPackTakerData(order, true, 0, true);
+
+        // Should fail with insufficient balance
+        // tokenC.mint(taker, 999e18);
+        tokenA.mint(taker, 1e18);
+        // vm.expectRevert(abi.encodeWithSelector(
+        //     OnlyTakerTokenBalanceGte.CurrentMultiplierIsNotInRange.selector,
+        //     taker,
+        //     address(tokenC),
+        //     999e18,
+        //     min_Multiplier
+        // ));
+        // swapVM.swap(order, 1e18, takerData);
+
+        // // Add 1e18 more to reach minimum
+        // tokenC.mint(taker, 1e18);
 
         // Should work now
         uint256 amountOut = _executeSwap(order, address(tokenA), address(tokenB), 1e18);

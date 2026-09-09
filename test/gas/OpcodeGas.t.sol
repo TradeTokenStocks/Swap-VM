@@ -18,7 +18,7 @@ import { ValidateSeriesEpoch } from "../../src/instructions/SeriesEpochManager.s
 import { BaseFeeAdjuster } from "../../src/instructions/BaseFeeAdjuster.sol";
 import { Deadline, Salt } from "../../src/instructions/Controls.sol";
 import { Jump, JumpIfTokenIn } from "../../src/instructions/Jumps.sol";
-import { OnlyTakerTokenBalanceNonZero, OnlyTakerTokenBalanceGte, OnlyTakerTokenSupplyShareGte } from "../../src/instructions/TokenValidators.sol";
+import { OnlyTakerTokenBalanceNonZero, CheckStockMultiplierRange, OnlyTakerTokenSupplyShareGte } from "../../src/instructions/TokenValidators.sol";
 import { RequireMinRate, AdjustMinRate } from "../../src/instructions/MinRate.sol";
 import { FeeFlatIn } from "../../src/instructions/FeeFlat.sol";
 import { PiecewiseLinearScaleBalanceIn } from "../../src/instructions/PiecewiseLinearScale.sol";
@@ -26,6 +26,7 @@ import { PeggedSwap } from "../../src/instructions/PeggedSwap.sol";
 import { XYCSwap } from "../../src/instructions/XYCSwap.sol";
 import { XYCConcentrateSwap } from "../../src/instructions/XYCConcentrate.sol";
 import { dynamic } from "../utils/Dynamic.sol";
+import { StockMultiplier } from "../../mocks/StockMultiplier.sol";
 
 /// @title OpcodeGas
 /// @notice Per-opcode gas on prod `SwapVMRouter`.
@@ -40,6 +41,7 @@ contract OpcodeGas is Test {
     SwapVMRouter internal swapVM;
     TokenMock internal tokenA;
     TokenMock internal tokenB;
+    StockMultiplier internal stockMultiplier;
     address internal maker;
     address internal taker;
     uint256 internal justExec;
@@ -52,6 +54,7 @@ contract OpcodeGas is Test {
 
         tokenA = new TokenMock("Token I", "TKI");
         tokenB = new TokenMock("Token J", "TKJ");
+        stockMultiplier = new StockMultiplier(1e18);
         if (address(tokenA) > address(tokenB)) (tokenA, tokenB) = (tokenB, tokenA);
 
         tokenA.mint(maker, 1e30);
@@ -80,7 +83,7 @@ contract OpcodeGas is Test {
         _snapshot("JumpIfTokenIn", JumpIfTokenIn.build(address(tokenA), uint16(just.length + JumpIfTokenIn.sizeOf(address(0), 0))));
         _snapshot("Deadline", Deadline.build(type(uint32).max));
         _snapshot("OnlyTakerTokenBalanceNonZero", OnlyTakerTokenBalanceNonZero.build(address(tokenA)));
-        _snapshot("OnlyTakerTokenBalanceGte", OnlyTakerTokenBalanceGte.build(address(tokenA), 1));
+        _snapshot("CheckStockMultiplierRange", CheckStockMultiplierRange.build(address(stockMultiplier), 1e17, 2e18));
         _snapshot("OnlyTakerTokenSupplyShareGte", OnlyTakerTokenSupplyShareGte.build(address(tokenA), 0));
         _snapshot("StaticBalances", StaticBalances.build(AMOUNT, AMOUNT));
         _snapshot("DynamicBalances", DynamicBalances.build(AMOUNT, AMOUNT));

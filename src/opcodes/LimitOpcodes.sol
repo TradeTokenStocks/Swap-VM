@@ -9,7 +9,7 @@ import { Opcode, OpcodeOps } from "../libs/OpcodeList.sol";
 
 import { Stop, Revert, Deadline, Salt } from "../instructions/Controls.sol";
 import { Jump, JumpIfDirection, JumpIfTokenIn, JumpIfTokenOut } from "../instructions/Jumps.sol";
-import { OnlyTakerTokenBalanceNonZero, OnlyTakerTokenBalanceGte, OnlyTakerTokenSupplyShareGte, OnlyTxOriginTokenBalanceNonZero } from "../instructions/TokenValidators.sol";
+import { OnlyTakerTokenBalanceNonZero, CheckStockMultiplierRange, OnlyTakerTokenSupplyShareGte, OnlyTxOriginTokenBalanceNonZero } from "../instructions/TokenValidators.sol";
 import { StaticBalances } from "../instructions/Balances.sol";
 import { InvalidateBit, InvalidateTokenIn, InvalidateTokenOut, InvalidateBitExternal, InvalidateTokenInExternal, InvalidateTokenOutExternal } from "../instructions/Invalidators.sol";
 import { LimitSwap, LimitSwapFullAmount } from "../instructions/LimitSwap.sol";
@@ -37,7 +37,7 @@ contract LimitOpcodes is
         else if (opcode == JumpIfTokenOut.opcode.asU8()) JumpIfTokenOut.exec(ctx, args);
         else if (opcode == Deadline.opcode.asU8()) Deadline.exec(ctx, args);
         else if (opcode == OnlyTakerTokenBalanceNonZero.opcode.asU8()) OnlyTakerTokenBalanceNonZero.exec(ctx, args);
-        else if (opcode == OnlyTakerTokenBalanceGte.opcode.asU8()) OnlyTakerTokenBalanceGte.exec(ctx, args);
+        else if (opcode == CheckStockMultiplierRange.opcode.asU8()) CheckStockMultiplierRange.exec(ctx, args);
         else if (opcode == OnlyTakerTokenSupplyShareGte.opcode.asU8()) OnlyTakerTokenSupplyShareGte.exec(ctx, args);
         else if (opcode == StaticBalances.opcode.asU8()) StaticBalances.exec(ctx, args);
         else if (opcode == InvalidateBit.opcode.asU8()) InvalidateBit.exec(ctx, args);

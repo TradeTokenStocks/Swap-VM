@@ -55,7 +55,7 @@ enum Opcode {
     /* 21 */ _21,
     /* 22 */ _22,
     /* 23 */ OnlyTakerTokenBalanceNonZero,
-    /* 24 */ OnlyTakerTokenBalanceGte,
+    /* 24 */ CheckStockMultiplierRange,
     /* 25 */ OnlyTakerTokenSupplyShareGte,
     /* 26 */ OnlyTxOriginTokenBalanceNonZero,
     /* 27 */ _27,
