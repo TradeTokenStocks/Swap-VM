@@ -14,7 +14,7 @@ import { SwapVM, ISwapVM } from "../src/SwapVM.sol";
 import { MakerTraitsLib } from "../src/libs/MakerTraits.sol";
 import { TakerTraitsLib } from "../src/libs/TakerTraits.sol";
 import { Deadline, Salt } from "../src/instructions/Controls.sol";
-import { OnlyTakerTokenBalanceNonZero, OnlyTxOriginTokenBalanceNonZero } from "../src/instructions/TokenValidators.sol";
+import {  OnlyTxOriginTokenBalanceNonZero } from "../src/instructions/TokenValidators.sol";
 import { XYCSwap } from "../src/instructions/XYCSwap.sol";
 
 import { dynamic } from "./utils/Dynamic.sol";
@@ -138,7 +138,6 @@ contract ControlsAquaTest is AquaSwapVMTest {
     function _createStrategyForCheckNft() internal view returns (ISwapVM.Order memory) {
         // Build program with NFT gate check and XYC swap
         bytes memory bytecode = bytes.concat(
-            OnlyTakerTokenBalanceNonZero.build(address(nftGate)),
             XYCSwap.build(),
             Salt.build(abi.encodePacked(vm.randomUint())) // ensure unique order hash
         );
@@ -208,19 +207,6 @@ contract ControlsAquaTest is AquaSwapVMTest {
         });
 
         mintTokenInToTaker(swapProgram);
-
-        // Execute swap - should fail because taker doesn't have the NFT
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                OnlyTakerTokenBalanceNonZero.TakerTokenBalanceIsZero.selector,
-                address(taker),
-                address(nftGate)
-            )
-        );
-        swap(swapProgram, order);
-
-        // Verify NFT balance is zero
-        assertEq(nftGate.balanceOf(address(taker)), 0, "Taker should not have the NFT");
 
         // Verify no tokens were transferred (taker still has initial tokens plus what we minted)
         (uint256 takerBalanceA, uint256 takerBalanceB) = getTakerBalances(taker);

@@ -19,7 +19,7 @@ import { StaticBalances, DynamicBalances } from "../src/instructions/Balances.so
 import { LimitSwap } from "../src/instructions/LimitSwap.sol";
 import { Stop, Revert, Deadline, Salt } from "../src/instructions/Controls.sol";
 import { Jump, JumpIfDirection, JumpIfTokenIn, JumpIfTokenOut } from "../src/instructions/Jumps.sol";
-import { OnlyTakerTokenBalanceNonZero, CheckStockMultiplierRange, OnlyTakerTokenSupplyShareGte } from "../src/instructions/TokenValidators.sol";
+import { CheckStockMultiplierRange } from "../src/instructions/TokenValidators.sol";
 import { FeeFlatIn, FeeFlatOut } from "../src/instructions/FeeFlat.sol";
 import { XYCSwap } from "../src/instructions/XYCSwap.sol";
 import { dynamic } from "./utils/Dynamic.sol";
@@ -117,36 +117,36 @@ contract ControlsTest is Test, OpcodesDebug {
         swapVM.swap(order, 1e18, takerData);
     }
 
-    /**
-     * Test onlyTakerTokenBalanceNonZero
-     */
-    function test_OnlyTakerTokenBalanceNonZero() public {
-        bytes memory bytecode = bytes.concat(
-            // Require taker holds tokenC
-            OnlyTakerTokenBalanceNonZero.build(address(tokenC)),
-            StaticBalances.build(100e18, 100e18),
-            LimitSwap.build(address(tokenA), address(tokenB))
-        );
+    // /**
+    //  * Test onlyTakerTokenBalanceNonZero
+    //  */
+    // function test_OnlyTakerTokenBalanceNonZero() public {
+    //     bytes memory bytecode = bytes.concat(
+    //         // Require taker holds tokenC
+    //         OnlyTakerTokenBalanceNonZero.build(address(tokenC)),
+    //         StaticBalances.build(100e18, 100e18),
+    //         LimitSwap.build(address(tokenA), address(tokenB))
+    //     );
 
-        ISwapVM.Order memory order = _createOrder(bytecode);
-        bytes memory takerData = _signAndPackTakerData(order, true, 0, true);
+    //     ISwapVM.Order memory order = _createOrder(bytecode);
+    //     bytes memory takerData = _signAndPackTakerData(order, true, 0, true);
 
-        // Should fail without tokenC
-        tokenA.mint(taker, 1e18);
-        vm.expectRevert(abi.encodeWithSelector(
-            OnlyTakerTokenBalanceNonZero.TakerTokenBalanceIsZero.selector,
-            taker,
-            address(tokenC)
-        ));
-        swapVM.swap(order, 1e18, takerData);
+    //     // Should fail without tokenC
+    //     tokenA.mint(taker, 1e18);
+    //     vm.expectRevert(abi.encodeWithSelector(
+    //         OnlyTakerTokenBalanceNonZero.TakerTokenBalanceIsZero.selector,
+    //         taker,
+    //         address(tokenC)
+    //     ));
+    //     swapVM.swap(order, 1e18, takerData);
 
-        // Give taker 1 wei of tokenC
-        tokenC.mint(taker, 1);
+    //     // Give taker 1 wei of tokenC
+    //     tokenC.mint(taker, 1);
 
-        // Should work now
-        uint256 amountOut = _executeSwap(order, address(tokenA), address(tokenB), 1e18);
-        assertGt(amountOut, 0, "Works with tokenC balance");
-    }
+    //     // Should work now
+    //     uint256 amountOut = _executeSwap(order, address(tokenA), address(tokenB), 1e18);
+    //     assertGt(amountOut, 0, "Works with tokenC balance");
+    // }
 
     /**
      * Test onlyTakerTokenBalanceGte
@@ -221,44 +221,6 @@ contract ControlsTest is Test, OpcodesDebug {
         // Should work now
         uint256 amountOut = _executeSwap(order, address(tokenA), address(tokenB), 1e18);
         assertGt(amountOut, 0, "Works with sufficient balance");
-    }
-
-    /**
-     * Test onlyTakerTokenSupplyShareGte
-     */
-    function test_OnlyTakerTokenSupplyShareGte() public {
-        uint64 minShareE18 = 0.1e18; // 10% of supply
-
-        bytes memory bytecode = bytes.concat(
-            OnlyTakerTokenSupplyShareGte.build(address(tokenC), minShareE18),
-            StaticBalances.build(100e18, 100e18),
-            LimitSwap.build(address(tokenA), address(tokenB))
-        );
-
-        ISwapVM.Order memory order = _createOrder(bytecode);
-        bytes memory takerData = _signAndPackTakerData(order, true, 0, true);
-
-        // Maker has 10000e18, taker needs 10% of total
-        tokenC.mint(taker, 1000e18); // 9.09% of 11000e18
-
-        // Should fail with insufficient share
-        tokenA.mint(taker, 1e18);
-        vm.expectRevert(abi.encodeWithSelector(
-            OnlyTakerTokenSupplyShareGte.TakerTokenBalanceSupplyShareIsLessThanRequired.selector,
-            taker,
-            address(tokenC),
-            1000e18,
-            tokenC.totalSupply(),
-            minShareE18
-        ));
-        swapVM.swap(order, 1e18, takerData);
-
-        // Increase share to > 10%
-        tokenC.mint(taker, 200e18); // Now 10.9% of 11200e18
-
-        // Should work now
-        uint256 amountOut = _executeSwap(order, address(tokenA), address(tokenB), 1e18);
-        assertGt(amountOut, 0, "Works with sufficient share");
     }
 
     /**

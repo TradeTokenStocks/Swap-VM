@@ -147,9 +147,7 @@ The execution flow shows all available instructions and strategies for each bala
 │    ├─ _jumpIfTokenIn → Conditional on exact input        │
 │    ├─ _jumpIfTokenOut → Conditional on exact output      │
 │    ├─ _deadline → Expiration check                       │
-│    ├─ _onlyTakerTokenBalanceNonZero → Require balance > 0│
 │    ├─ _onlyTakerTokenBalanceGte → Minimum balance check  │
-│    ├─ _onlyTakerTokenSupplyShareGte → Min % of supply   │
 │    └─ _salt → Order uniqueness (hash modifier)           │
 │                                                          │
 │ EXECUTION (On-chain)                                     │
@@ -208,9 +206,7 @@ The execution flow shows all available instructions and strategies for each bala
 │    ├─ _jumpIfTokenIn → Conditional jump on exact input     │
 │    ├─ _jumpIfTokenOut → Conditional jump on exact output   │
 │    ├─ _deadline → Expiration check                         │
-│    ├─ _onlyTakerTokenBalanceNonZero → Require balance > 0  │
 │    ├─ _onlyTakerTokenBalanceGte → Minimum balance check    │
-│    ├─ _onlyTakerTokenSupplyShareGte → Min % of supply     │
 │    └─ _salt → Order uniqueness (hash modifier)             │
 │                                                            │
 ├────────────────────────────────────────────────────────────┤
@@ -1044,4 +1040,3 @@ See the [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) file for information about th
 **Contact for licensing inquiries:**
 - 📧 license@degensoft.com 
 - 📧 legal@degensoft.com
-

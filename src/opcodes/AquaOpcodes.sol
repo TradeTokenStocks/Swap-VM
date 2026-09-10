@@ -9,7 +9,7 @@ import { Opcode, OpcodeOps } from "../libs/OpcodeList.sol";
 
 import { Stop, Revert, Deadline, Salt } from "../instructions/Controls.sol";
 import { Jump, JumpIfDirection, JumpIfTokenIn, JumpIfTokenOut } from "../instructions/Jumps.sol";
-import { OnlyTakerTokenBalanceNonZero, CheckStockMultiplierRange, OnlyTakerTokenSupplyShareGte, OnlyTxOriginTokenBalanceNonZero } from "../instructions/TokenValidators.sol";
+import { CheckStockMultiplierRange, OnlyTxOriginTokenBalanceNonZero } from "../instructions/TokenValidators.sol";
 import { XYCSwap } from "../instructions/XYCSwap.sol";
 import { XYCConcentrateSwap } from "../instructions/XYCConcentrate.sol";
 import { Decay } from "../instructions/Decay.sol";
@@ -29,9 +29,7 @@ contract AquaOpcodes {
         else if (opcode == JumpIfTokenIn.opcode.asU8()) JumpIfTokenIn.exec(ctx, args);
         else if (opcode == JumpIfTokenOut.opcode.asU8()) JumpIfTokenOut.exec(ctx, args);
         else if (opcode == Deadline.opcode.asU8()) Deadline.exec(ctx, args);
-        else if (opcode == OnlyTakerTokenBalanceNonZero.opcode.asU8()) OnlyTakerTokenBalanceNonZero.exec(ctx, args);
         else if (opcode == CheckStockMultiplierRange.opcode.asU8()) CheckStockMultiplierRange.exec(ctx, args);
-        else if (opcode == OnlyTakerTokenSupplyShareGte.opcode.asU8()) OnlyTakerTokenSupplyShareGte.exec(ctx, args);
         else if (opcode == XYCSwap.opcode.asU8()) XYCSwap.exec(ctx, args);
         else if (opcode == XYCConcentrateSwap.opcode.asU8()) XYCConcentrateSwap.exec(ctx, args);
         else if (opcode == Decay.opcode.asU8()) Decay.exec(ctx, args);

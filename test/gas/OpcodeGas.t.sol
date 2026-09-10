@@ -18,7 +18,7 @@ import { ValidateSeriesEpoch } from "../../src/instructions/SeriesEpochManager.s
 import { BaseFeeAdjuster } from "../../src/instructions/BaseFeeAdjuster.sol";
 import { Deadline, Salt } from "../../src/instructions/Controls.sol";
 import { Jump, JumpIfTokenIn } from "../../src/instructions/Jumps.sol";
-import { OnlyTakerTokenBalanceNonZero, CheckStockMultiplierRange, OnlyTakerTokenSupplyShareGte } from "../../src/instructions/TokenValidators.sol";
+import { CheckStockMultiplierRange } from "../../src/instructions/TokenValidators.sol";
 import { RequireMinRate, AdjustMinRate } from "../../src/instructions/MinRate.sol";
 import { FeeFlatIn } from "../../src/instructions/FeeFlat.sol";
 import { PiecewiseLinearScaleBalanceIn } from "../../src/instructions/PiecewiseLinearScale.sol";
@@ -82,9 +82,7 @@ contract OpcodeGas is Test {
         _snapshot("Jump", Jump.build(uint16(just.length + Jump.sizeOf(0))));
         _snapshot("JumpIfTokenIn", JumpIfTokenIn.build(address(tokenA), uint16(just.length + JumpIfTokenIn.sizeOf(address(0), 0))));
         _snapshot("Deadline", Deadline.build(type(uint32).max));
-        _snapshot("OnlyTakerTokenBalanceNonZero", OnlyTakerTokenBalanceNonZero.build(address(tokenA)));
         _snapshot("CheckStockMultiplierRange", CheckStockMultiplierRange.build(address(stockMultiplier), 1e17, 2e18));
-        _snapshot("OnlyTakerTokenSupplyShareGte", OnlyTakerTokenSupplyShareGte.build(address(tokenA), 0));
         _snapshot("StaticBalances", StaticBalances.build(AMOUNT, AMOUNT));
         _snapshot("DynamicBalances", DynamicBalances.build(AMOUNT, AMOUNT));
         _snapshot("InvalidateBit", InvalidateBit.build(15));
