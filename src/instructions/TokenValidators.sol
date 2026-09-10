@@ -13,47 +13,6 @@ import { MemoryPtr, MemoryPtrLib } from "../libs/MemoryPtr.sol";
 import { InstructionBuilder } from "../libs/InstructionBuilder.sol";
 import { InstructionArgs } from "../libs/InstructionArgs.sol";
 
-/// @notice OnlyTxOriginTokenBalanceNonZero opcode, fail if tx.origin token balance is zero (NFT-compatible)
-///   The opcode allows authorized user to fill the order through 3rd-party contracts
-/// @dev Encoding: [address token]
-/// @dev Validations through tx.origin are considered weak due to possible transaction flow
-///   interception: any contract executing tx originated from tx.origin can pass the validation
-library OnlyTxOriginTokenBalanceNonZero {
-    using InstructionArgs for bytes;
-    using InstructionArgs for bytes32;
-
-    using MemoryPtrLib for MemoryPtr;
-    using InstructionBuilder for MemoryPtr;
-
-    error TxOriginTokenBalanceIsZero(address txOrigin, address token);
-
-    Opcode constant opcode = Opcode.OnlyTxOriginTokenBalanceNonZero;
-
-    function sizeOf(address) internal pure returns (uint256) {
-        return InstructionBuilder.sizeOf() + 20;
-    }
-
-    function build(address token) internal pure returns (bytes memory) {
-        return build(MemoryPtrLib.alloc(sizeOf(token)), token).resolve();
-    }
-
-    function build(MemoryPtr ptrStart, address token) internal pure returns (MemoryPtr ptr) {
-        ptr = ptrStart.pushHeader(opcode);
-        ptr = ptr.push(token);
-        ptrStart.patchLength(ptr);
-    }
-
-    function parse(bytes calldata args) internal pure returns (address token) {
-        token = args.at(0).asAddress();
-    }
-
-    function exec(Context memory, bytes calldata args) internal view {
-        address token = parse(args);
-        uint256 balance = IERC20(token).balanceOf(tx.origin);
-        require(balance > 0, TxOriginTokenBalanceIsZero(tx.origin, token));
-    }
-}
-
 /// @notice CheckStockMultiplierRange opcode, fail if token multiplier is not in range expected value
 /// @dev Encoding: [address token, uint256 min_multiplier, uint256 max_multiplier]
 library CheckStockMultiplierRange {

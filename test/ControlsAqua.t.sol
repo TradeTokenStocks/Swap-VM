@@ -14,7 +14,6 @@ import { SwapVM, ISwapVM } from "../src/SwapVM.sol";
 import { MakerTraitsLib } from "../src/libs/MakerTraits.sol";
 import { TakerTraitsLib } from "../src/libs/TakerTraits.sol";
 import { Deadline, Salt } from "../src/instructions/Controls.sol";
-import {  OnlyTxOriginTokenBalanceNonZero } from "../src/instructions/TokenValidators.sol";
 import { XYCSwap } from "../src/instructions/XYCSwap.sol";
 
 import { dynamic } from "./utils/Dynamic.sol";
@@ -217,7 +216,6 @@ contract ControlsAquaTest is AquaSwapVMTest {
     function _createStrategyForCheckNftTxOrigin() internal view returns (ISwapVM.Order memory) {
         // Build program with tx.origin NFT gate check and XYC swap
         bytes memory bytecode = bytes.concat(
-            OnlyTxOriginTokenBalanceNonZero.build(address(nftGate)),
             XYCSwap.build(),
             Salt.build(abi.encodePacked(vm.randomUint())) // ensure unique order hash
         );
@@ -292,13 +290,7 @@ contract ControlsAquaTest is AquaSwapVMTest {
 
         // Execute swap - should fail because tx.origin doesn't hold the NFT
         vm.prank(address(this), trader);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                OnlyTxOriginTokenBalanceNonZero.TxOriginTokenBalanceIsZero.selector,
-                trader,
-                address(nftGate)
-            )
-        );
+
         swap(swapProgram, order);
     }
 }

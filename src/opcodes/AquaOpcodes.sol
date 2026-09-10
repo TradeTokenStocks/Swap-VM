@@ -9,7 +9,7 @@ import { Opcode, OpcodeOps } from "../libs/OpcodeList.sol";
 
 import { Stop, Revert, Deadline, Salt } from "../instructions/Controls.sol";
 import { Jump, JumpIfDirection, JumpIfTokenIn, JumpIfTokenOut } from "../instructions/Jumps.sol";
-import { CheckStockMultiplierRange, OnlyTxOriginTokenBalanceNonZero } from "../instructions/TokenValidators.sol";
+import { CheckStockMultiplierRange } from "../instructions/TokenValidators.sol";
 import { XYCSwap } from "../instructions/XYCSwap.sol";
 import { XYCConcentrateSwap } from "../instructions/XYCConcentrate.sol";
 import { Decay } from "../instructions/Decay.sol";
@@ -38,7 +38,6 @@ contract AquaOpcodes {
         else if (opcode == FeeProtocol.opcode.asU8()) FeeProtocol.exec(ctx, args);
         else if (opcode == PeggedSwap.opcode.asU8()) PeggedSwap.exec(ctx, args);
         else if (opcode == Extruction.opcode.asU8()) Extruction.exec(ctx, args);
-        else if (opcode == OnlyTxOriginTokenBalanceNonZero.opcode.asU8()) OnlyTxOriginTokenBalanceNonZero.exec(ctx, args);
         else revert UnknownOpcode(opcode);
     }
 }

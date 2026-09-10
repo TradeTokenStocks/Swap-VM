@@ -11,8 +11,7 @@ import { LimitSwap } from "../instructions/LimitSwap.sol";
 import { XYCConcentrateSwap } from "../instructions/XYCConcentrate.sol";
 import { FeeFlatIn } from "../instructions/FeeFlat.sol";
 import {
-    CheckStockMultiplierRange,
-    OnlyTxOriginTokenBalanceNonZero
+    CheckStockMultiplierRange
 } from "../instructions/TokenValidators.sol";
 import { Deadline, Salt } from "../instructions/Controls.sol";
 import { ValidateSeriesEpoch } from "../instructions/SeriesEpochManager.sol";
@@ -43,7 +42,6 @@ library Strategies {
 
     uint256 private constant _prefixBitmap =
         (1 << uint256(CheckStockMultiplierRange.opcode)) |
-        (1 << uint256(OnlyTxOriginTokenBalanceNonZero.opcode)) |
         (1 << uint256(Deadline.opcode)) |
         (1 << uint256(Salt.opcode)) |
         (1 << uint256(ValidateSeriesEpoch.opcode));

@@ -24,7 +24,7 @@ import { PiecewiseLinearScaleBalanceIn, PiecewiseLinearScaleBalanceOut, Piecewis
 import { BaseFeeAdjuster } from "../src/instructions/BaseFeeAdjuster.sol";
 import { Stop, Revert, Deadline, Salt } from "../src/instructions/Controls.sol";
 import { Jump, JumpIfDirection, JumpIfTokenIn, JumpIfTokenOut } from "../src/instructions/Jumps.sol";
-import { OnlyTakerTokenBalanceNonZero, OnlyTakerTokenSupplyShareGte, OnlyTxOriginTokenBalanceNonZero,CheckStockMultiplierRange } from "../src/instructions/TokenValidators.sol";
+import { CheckStockMultiplierRange } from "../src/instructions/TokenValidators.sol";
 import { RequireMinRate, AdjustMinRate } from "../src/instructions/MinRate.sol";
 import { FeeFlatIn, FeeFlatOut } from "../src/instructions/FeeFlat.sol";
 import { PatchSwapRegisters } from "../src/instructions/Debug.sol";
@@ -87,14 +87,8 @@ contract GasSnapshotE2E is Script {
         _label("_vmProgramJustDeadline");
         _fill(_vmProgramJustDeadline());
 
-        _label("_vmProgramJustOnlyTakerTokenBalanceNonZero");
-        _fill(_vmProgramJustOnlyTakerTokenBalanceNonZero());
-
-        _label("_vmProgramJustOnlyTakerTokenBalanceGte");
-        _fill(_vmProgramJustOnlyTakerTokenBalanceGte());
-
-        _label("_vmProgramJustOnlyTakerTokenSupplyShareGte");
-        _fill(_vmProgramJustOnlyTakerTokenSupplyShareGte());
+        _label("_vmProgramJustCheckStockMultiplierRange");
+        _fill(_vmProgramJustCheckStockMultiplierRange());
 
         _label("_vmProgramJustSalt");
         _fill(_vmProgramJustSalt());
@@ -215,26 +209,13 @@ contract GasSnapshotE2E is Script {
         );
     }
 
-    function _vmProgramJustOnlyTakerTokenBalanceNonZero() internal view returns (bytes memory) {
-        return bytes.concat(
-            PatchSwapRegisters.build(SwapRegisters({balanceIn: AMOUNT, balanceOut: AMOUNT, amountIn: AMOUNT, amountOut: AMOUNT})),
-            OnlyTakerTokenBalanceNonZero.build(address(tokenA))
-        );
-    }
-
-    function _vmProgramJustOnlyTakerTokenBalanceGte() internal view returns (bytes memory) {
+    function _vmProgramJustCheckStockMultiplierRange() internal view returns (bytes memory) {
         return bytes.concat(
             PatchSwapRegisters.build(SwapRegisters({balanceIn: AMOUNT, balanceOut: AMOUNT, amountIn: AMOUNT, amountOut: AMOUNT})),
             CheckStockMultiplierRange.build(address(tokenA), 1e17, 2e18)
         );
     }
 
-    function _vmProgramJustOnlyTakerTokenSupplyShareGte() internal view returns (bytes memory) {
-        return bytes.concat(
-            PatchSwapRegisters.build(SwapRegisters({balanceIn: AMOUNT, balanceOut: AMOUNT, amountIn: AMOUNT, amountOut: AMOUNT})),
-            OnlyTakerTokenSupplyShareGte.build(address(tokenA), 0)
-        );
-    }
 
     function _vmProgramJustSalt() internal pure returns (bytes memory) {
         return bytes.concat(

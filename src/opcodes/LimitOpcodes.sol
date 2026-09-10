@@ -9,7 +9,7 @@ import { Opcode, OpcodeOps } from "../libs/OpcodeList.sol";
 
 import { Stop, Revert, Deadline, Salt } from "../instructions/Controls.sol";
 import { Jump, JumpIfDirection, JumpIfTokenIn, JumpIfTokenOut } from "../instructions/Jumps.sol";
-import { CheckStockMultiplierRange, OnlyTxOriginTokenBalanceNonZero } from "../instructions/TokenValidators.sol";
+import { CheckStockMultiplierRange } from "../instructions/TokenValidators.sol";
 import { StaticBalances } from "../instructions/Balances.sol";
 import { InvalidateBit, InvalidateTokenIn, InvalidateTokenOut, InvalidateBitExternal, InvalidateTokenInExternal, InvalidateTokenOutExternal } from "../instructions/Invalidators.sol";
 import { LimitSwap, LimitSwapFullAmount } from "../instructions/LimitSwap.sol";
@@ -52,7 +52,6 @@ contract LimitOpcodes is
         else if (opcode == WhitelistCoequal.opcode.asU8()) WhitelistCoequal.exec(ctx, args);
         else if (opcode == PiecewiseLinearScaleBalanceIn.opcode.asU8()) PiecewiseLinearScaleBalanceIn.exec(ctx, args);
         else if (opcode == PiecewiseLinearScaleBalanceOut.opcode.asU8()) PiecewiseLinearScaleBalanceOut.exec(ctx, args);
-        else if (opcode == OnlyTxOriginTokenBalanceNonZero.opcode.asU8()) OnlyTxOriginTokenBalanceNonZero.exec(ctx, args);
         else if (opcode == WhitelistSequential.opcode.asU8()) WhitelistSequential.exec(ctx, args);
         else revert UnknownOpcode(opcode);
     }
