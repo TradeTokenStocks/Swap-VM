@@ -13,7 +13,6 @@ import { TakerTraitsLib } from "../../src/libs/TakerTraits.sol";
 import { StaticBalances, DynamicBalances } from "../../src/instructions/Balances.sol";
 import { LimitSwap, LimitSwapFullAmount } from "../../src/instructions/LimitSwap.sol";
 import { InvalidateTokenIn, InvalidateBit } from "../../src/instructions/Invalidators.sol";
-import { PrivateOrder } from "../../src/instructions/Whitelist.sol";
 import { ValidateSeriesEpoch } from "../../src/instructions/SeriesEpochManager.sol";
 import { BaseFeeAdjuster } from "../../src/instructions/BaseFeeAdjuster.sol";
 import { Deadline, Salt } from "../../src/instructions/Controls.sol";
@@ -98,7 +97,6 @@ contract OpcodeGas is Test {
         _snapshot("FeeFlatIn", FeeFlatIn.build(0.10e7));
         _snapshot("PeggedSwap", PeggedSwap.build(50e18, 50e18, 0.02e9, 1, 1));
         _snapshot("ValidateSeriesEpoch", ValidateSeriesEpoch.build(10, 0));
-        _snapshot("PrivateOrder", PrivateOrder.build(taker));
         _snapshot(
             "PiecewiseLinearScaleBalanceIn",
             PiecewiseLinearScaleBalanceIn.build(

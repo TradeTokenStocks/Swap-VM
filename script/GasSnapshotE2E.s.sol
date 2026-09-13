@@ -17,7 +17,7 @@ import { OpcodesDebug } from "../src/opcodes/OpcodesDebug.sol";
 import { StaticBalances, DynamicBalances } from "../src/instructions/Balances.sol";
 import { LimitSwap, LimitSwapFullAmount } from "../src/instructions/LimitSwap.sol";
 import { InvalidateTokenOut, InvalidateTokenIn, InvalidateBit } from "../src/instructions/Invalidators.sol";
-import { PrivateOrder, WhitelistCoequal, WhitelistSequential } from "../src/instructions/Whitelist.sol";
+import { WhitelistCoequal, WhitelistSequential } from "../src/instructions/Whitelist.sol";
 import { ValidateSeriesEpoch } from "../src/instructions/SeriesEpochManager.sol";
 import { Decay } from "../src/instructions/Decay.sol";
 import { PiecewiseLinearScaleBalanceIn, PiecewiseLinearScaleBalanceOut, PiecewiseLinearScale } from "../src/instructions/PiecewiseLinearScale.sol";
@@ -71,9 +71,6 @@ contract GasSnapshotE2E is Script {
 
         _label("_vmProgramJustEpoch");
         _fill(_vmProgramJustEpoch());
-
-        _label("_vmProgramJustPrivateOrder");
-        _fill(_vmProgramJustPrivateOrder());
 
         _label("_vmProgramJustBaseFeeAdjuster");
         _fill(_vmProgramJustBaseFeeAdjuster());
@@ -174,12 +171,6 @@ contract GasSnapshotE2E is Script {
         );
     }
 
-    function _vmProgramJustPrivateOrder() internal view returns (bytes memory) {
-        return bytes.concat(
-            PatchSwapRegisters.build(SwapRegisters({balanceIn: AMOUNT, balanceOut: AMOUNT, amountIn: AMOUNT, amountOut: AMOUNT})),
-            PrivateOrder.build(taker)
-        );
-    }
 
     function _vmProgramJustBaseFeeAdjuster() internal pure returns (bytes memory) {
         return bytes.concat(
@@ -291,7 +282,6 @@ contract GasSnapshotE2E is Script {
     function _vmProgramLimitOrderPrivate() internal view returns (bytes memory) {
         return bytes.concat(
             StaticBalances.build(1e18, 1e18),
-            PrivateOrder.build(taker),
             InvalidateBit.build(13),
             LimitSwap.build(address(tokenA), address(tokenB))
         );

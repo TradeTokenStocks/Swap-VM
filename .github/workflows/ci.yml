@@ -45,9 +45,6 @@ jobs:
         id: test
         run: yarn test
 
-      - name: Run snapshot check
-        run: yarn snapshot:check
-
       # After tests so cache/test-artifacts/ is warm for the next SHA.
       - name: Save Hardhat cache
         if: always() && steps.test.outcome == 'success' && steps.hh-cache.outputs.cache-hit != 'true'

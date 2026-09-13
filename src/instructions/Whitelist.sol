@@ -10,46 +10,6 @@ import { MemoryPtr, MemoryPtrLib } from "../libs/MemoryPtr.sol";
 import { InstructionBuilder } from "../libs/InstructionBuilder.sol";
 import { InstructionArgs } from "../libs/InstructionArgs.sol";
 
-/// @notice PrivateOrder opcode, allows the order to be executed only by the specified taker
-/// @dev Encoding: [uint80 allowedTaker]
-/// @dev Address packing trade-off: only the last 10 bytes of each address are compared
-///   Mining 80 bits of an address takes millions of GPU-years, still avoid "free money" orders for long-known accounts
-///   Birthday attack 80-bit collisions are feasible, however both accounts are controlled by a single attacker, not a bypass
-library PrivateOrder {
-    using InstructionArgs for bytes;
-    using InstructionArgs for bytes32;
-
-    using MemoryPtrLib for MemoryPtr;
-    using InstructionBuilder for MemoryPtr;
-
-    error PrivateOrderInvalidTaker();
-
-    Opcode constant opcode = Opcode.PrivateOrder;
-
-    function sizeOf(address) internal pure returns (uint256) {
-        return InstructionBuilder.sizeOf() + 10;
-    }
-
-    function build(address allowedTaker) internal pure returns (bytes memory) {
-        return build(MemoryPtrLib.alloc(sizeOf(allowedTaker)), allowedTaker).resolve();
-    }
-
-    function build(MemoryPtr ptrStart, address allowedTaker) internal pure returns (MemoryPtr ptr) {
-        ptr = ptrStart.pushHeader(opcode);
-        ptr = ptr.push(uint80(uint160(allowedTaker)), 10);
-        ptrStart.patchLength(ptr);
-    }
-
-    function parse(bytes calldata args) internal pure returns (uint80 allowedTaker) {
-        allowedTaker = args.at(0).asU80();
-    }
-
-    function exec(Context memory ctx, bytes calldata args) internal pure {
-        uint80 sender = uint80(uint160(ctx.query.taker));
-        require(sender == parse(args), PrivateOrderInvalidTaker());
-    }
-}
-
 /// @notice WhitelistCoequal opcode, jumps to the specified program counter if the taker is whitelisted,
 ///   continues execution normally otherwise
 /// @dev Encoding: [uint16 nextPC, uint80 allowedTakers[N]]
