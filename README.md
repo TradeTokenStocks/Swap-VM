@@ -125,7 +125,6 @@ The execution flow shows all available instructions and strategies for each bala
 │ 4. Dynamic Pricing (Optional, Combinable)                │
 │    ├─ _dutchAuctionBalanceIn1D → Decreasing input amount  │
 │    ├─ _dutchAuctionBalanceOut1D → Increasing output amount│
-│    ├─ _oraclePriceAdjuster1D → External price feed       │
 │    └─ _baseFeeAdjuster1D → Gas-responsive pricing        │
 │                                                          │
 │ 5. Fee Mechanisms (Optional, Combinable)                 │
