@@ -4,7 +4,6 @@ pragma solidity 0.8.30;
 /// @custom:license-url https://github.com/1inch/swap-vm/blob/main/LICENSES/SwapVM-1.1.txt
 /// @custom:copyright © 2025 Degensoft Ltd
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IStockMultiplier } from "./interfaces/ITokenizedStocks.sol";
 
 import { Context } from "../libs/VM.sol";
@@ -25,7 +24,7 @@ library CheckStockMultiplierRange {
     error MinMultiplierMustBeGreaterThanZero(uint256 min_multiplier);
     error MaxMultiplierMustBeGreaterThanMinMultiplier(uint256 max_multiplier, uint256 min_multiplier);
     error TokenMultiplierIsZero(address token);
-    error CurrentMultiplierIsNotInRange(address taker, address token, uint256 current_multiplier, uint256 min_multiplier, uint256 max_multiplier);
+    error CurrentMultiplierIsNotInRange(address token, uint256 current_multiplier, uint256 min_multiplier, uint256 max_multiplier);
 
     Opcode constant opcode = Opcode.CheckStockMultiplierRange;
 
@@ -51,10 +50,10 @@ library CheckStockMultiplierRange {
         max_multiplier = args.at(52).asU256();
     }
 
-    function exec(Context memory ctx, bytes calldata args) internal view {
+    function exec(Context memory, bytes calldata args) internal view {
         (address token, uint256 min_multiplier, uint256 max_multiplier) = parse(args);
         uint256 current_multiplier = IStockMultiplier(token).multiplier();
 
-        require(current_multiplier >= min_multiplier && current_multiplier <= max_multiplier, CurrentMultiplierIsNotInRange(ctx.query.taker, token, current_multiplier, min_multiplier, max_multiplier));
+        require(current_multiplier >= min_multiplier && current_multiplier <= max_multiplier, CurrentMultiplierIsNotInRange(token, current_multiplier, min_multiplier, max_multiplier));
     }
 }

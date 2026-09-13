@@ -149,78 +149,189 @@ contract ControlsTest is Test, OpcodesDebug {
     // }
 
     /**
-     * Test onlyTakerTokenBalanceGte
+     * Test checkStockMultiplierRange keeps the position tradable inside the maker's range
      */
     function test_CheckStockMultiplierRange() public {
-        uint256 min_Multiplier = 1e17;
-        uint256 max_Multiplier = 2e18;
-
         StockMultiplier stock = new StockMultiplier(1e18);
+        ISwapVM.Order memory order = _stockRangeOrder(address(stock), 0.1e18, 2e18);
 
-        bytes memory bytecode = bytes.concat(
-            CheckStockMultiplierRange.build(address(stock), min_Multiplier, max_Multiplier),
-            StaticBalances.build(100e18, 100e18),
-            LimitSwap.build(address(tokenA), address(tokenB))
-        );
-
-        ISwapVM.Order memory order = _createOrder(bytecode);
-        bytes memory takerData = _signAndPackTakerData(order, true, 0, true);
-
-        // Should fail with insufficient balance
-        // tokenC.mint(taker, 999e18);
-        tokenA.mint(taker, 1e18);
-        // vm.expectRevert(abi.encodeWithSelector(
-        //     OnlyTakerTokenBalanceGte.CurrentMultiplierIsNotInRange.selector,
-        //     taker,
-        //     address(tokenC),
-        //     999e18,
-        //     min_Multiplier
-        // ));
-        // swapVM.swap(order, 1e18, takerData);
-
-        // // Add 1e18 more to reach minimum
-        // tokenC.mint(taker, 1e18);
-
-        // Should work now
         uint256 amountOut = _executeSwap(order, address(tokenA), address(tokenB), 1e18);
-        assertGt(amountOut, 0, "Works with sufficient balance");
+        assertEq(amountOut, 1e18, "Trades while multiplier is in range");
     }
 
+    /**
+     * Test both range bounds are inclusive
+     */
+    function test_CheckStockMultiplierRange_BoundsAreInclusive() public {
+        uint256 minMultiplier = 0.1e18;
+        uint256 maxMultiplier = 2e18;
+
+        StockMultiplier stock = new StockMultiplier(minMultiplier);
+        ISwapVM.Order memory order = _stockRangeOrder(address(stock), minMultiplier, maxMultiplier);
+
+        assertEq(_executeSwap(order, address(tokenA), address(tokenB), 1e18), 1e18, "Trades at min multiplier");
+
+        stock.setMultiplier(maxMultiplier);
+        assertEq(_executeSwap(order, address(tokenA), address(tokenB), 1e18), 1e18, "Trades at max multiplier");
+    }
+
+    /**
+     * Test a multiplier below the maker's range makes the position untradable
+     */
+    function test_CheckStockMultiplierRange_RevertBelowMin() public {
+        uint256 minMultiplier = 0.1e18;
+        uint256 maxMultiplier = 2e18;
+
+        StockMultiplier stock = new StockMultiplier(minMultiplier - 1);
+        ISwapVM.Order memory order = _stockRangeOrder(address(stock), minMultiplier, maxMultiplier);
+
+        _expectMultiplierOutOfRange(order, address(stock), minMultiplier - 1, minMultiplier, maxMultiplier);
+    }
+
+    /**
+     * Test a multiplier above the maker's range makes the position untradable
+     */
+    function test_CheckStockMultiplierRange_RevertAboveMax() public {
+        uint256 minMultiplier = 0.1e18;
+        uint256 maxMultiplier = 2e18;
+
+        StockMultiplier stock = new StockMultiplier(maxMultiplier + 1);
+        ISwapVM.Order memory order = _stockRangeOrder(address(stock), minMultiplier, maxMultiplier);
+
+        _expectMultiplierOutOfRange(order, address(stock), maxMultiplier + 1, minMultiplier, maxMultiplier);
+    }
+
+    /**
+     * Test min == max pins the position to a single multiplier value
+     */
+    function test_CheckStockMultiplierRange_SingleAllowedMultiplier() public {
+        StockMultiplier stock = new StockMultiplier(1e18);
+        ISwapVM.Order memory order = _stockRangeOrder(address(stock), 1e18, 1e18);
+
+        assertEq(_executeSwap(order, address(tokenA), address(tokenB), 1e18), 1e18, "Trades at the pinned multiplier");
+
+        stock.setMultiplier(1e18 + 1);
+        _expectMultiplierOutOfRange(order, address(stock), 1e18 + 1, 1e18, 1e18);
+    }
+
+    /**
+     * Test the position follows the multiplier in and out of the maker's range without re-signing
+     */
+    function test_CheckStockMultiplierRange_TradableOnlyWhileInRange() public {
+        uint256 minMultiplier = 0.9e18;
+        uint256 maxMultiplier = 1.1e18;
+
+        StockMultiplier stock = new StockMultiplier(1e18);
+        ISwapVM.Order memory order = _stockRangeOrder(address(stock), minMultiplier, maxMultiplier);
+
+        assertEq(_executeSwap(order, address(tokenA), address(tokenB), 1e18), 1e18, "Trades before the split");
+
+        // A 2:1 split moves the multiplier out of the range the maker signed for
+        stock.setMultiplier(2e18);
+        _expectMultiplierOutOfRange(order, address(stock), 2e18, minMultiplier, maxMultiplier);
+
+        // Same order becomes tradable again once the multiplier is back in range
+        stock.setMultiplier(maxMultiplier);
+        assertEq(_executeSwap(order, address(tokenA), address(tokenB), 1e18), 1e18, "Trades again once back in range");
+    }
+
+    /**
+     * Test an out-of-range position is not quotable either, not just unswappable
+     */
+    function test_CheckStockMultiplierRange_QuoteRevertsOutOfRange() public {
+        StockMultiplier stock = new StockMultiplier(3e18);
+        ISwapVM.Order memory order = _stockRangeOrder(address(stock), 0.1e18, 2e18);
+
+        bytes memory takerData = _signAndPackTakerData(order, true, 0, true);
+        ISwapVM quoter = swapVM.asView();
+
+        vm.expectRevert(abi.encodeWithSelector(
+            CheckStockMultiplierRange.CurrentMultiplierIsNotInRange.selector,
+            address(stock),
+            3e18,
+            0.1e18,
+            2e18
+        ));
+        quoter.quote(order, 1e18, takerData);
+    }
+
+    /**
+     * Test the check fails closed for a token that does not expose multiplier()
+     */
+    function test_CheckStockMultiplierRange_RevertWhenTokenHasNoMultiplier() public {
+        ISwapVM.Order memory order = _stockRangeOrder(address(tokenC), 0.1e18, 2e18);
+
+        bytes memory takerData = _signAndPackTakerData(order, true, 0, true);
+        tokenA.mint(taker, 1e18);
+        // multiplier() has no implementation to dispatch to, so the staticcall reverts with empty data
+        vm.expectRevert(bytes(""));
+        swapVM.swap(order, 1e18, takerData);
+    }
+
+    /**
+     * Test every check in the program is evaluated, not only the first one
+     */
     function test_MultipleCheckStockMultiplierRange() public {
-        uint256 min_Multiplier = 1e17;
-        uint256 max_Multiplier = 2e18;
+        uint256 minMultiplier = 0.1e18;
+        uint256 maxMultiplier = 2e18;
 
         StockMultiplier stock1 = new StockMultiplier(1e18);
         StockMultiplier stock2 = new StockMultiplier(1e18);
 
-        bytes memory bytecode = bytes.concat(
-            CheckStockMultiplierRange.build(address(stock1), min_Multiplier, max_Multiplier),
-            CheckStockMultiplierRange.build(address(stock2), min_Multiplier, max_Multiplier),
+        ISwapVM.Order memory order = _createOrder(bytes.concat(
+            CheckStockMultiplierRange.build(address(stock1), minMultiplier, maxMultiplier),
+            CheckStockMultiplierRange.build(address(stock2), minMultiplier, maxMultiplier),
             StaticBalances.build(100e18, 100e18),
             LimitSwap.build(address(tokenA), address(tokenB))
-        );
+        ));
 
-        ISwapVM.Order memory order = _createOrder(bytecode);
-        bytes memory takerData = _signAndPackTakerData(order, true, 0, true);
+        assertEq(_executeSwap(order, address(tokenA), address(tokenB), 1e18), 1e18, "Trades while both multipliers are in range");
 
-        // Should fail with insufficient balance
-        // tokenC.mint(taker, 999e18);
-        tokenA.mint(taker, 1e18);
-        // vm.expectRevert(abi.encodeWithSelector(
-        //     OnlyTakerTokenBalanceGte.CurrentMultiplierIsNotInRange.selector,
-        //     taker,
-        //     address(tokenC),
-        //     999e18,
-        //     min_Multiplier
-        // ));
-        // swapVM.swap(order, 1e18, takerData);
+        // The second check must reject even though the first one passes
+        stock2.setMultiplier(maxMultiplier + 1);
+        _expectMultiplierOutOfRange(order, address(stock2), maxMultiplier + 1, minMultiplier, maxMultiplier);
+    }
 
-        // // Add 1e18 more to reach minimum
-        // tokenC.mint(taker, 1e18);
+    /**
+     * Test the builder rejects ranges no multiplier can satisfy
+     */
+    function test_CheckStockMultiplierRange_BuildRejectsZeroMin() public {
+        vm.expectRevert(abi.encodeWithSelector(
+            CheckStockMultiplierRange.MinMultiplierMustBeGreaterThanZero.selector,
+            0
+        ));
+        this.buildCheckStockMultiplierRange(address(0), 0, 2e18);
+    }
 
-        // Should work now
-        uint256 amountOut = _executeSwap(order, address(tokenA), address(tokenB), 1e18);
-        assertGt(amountOut, 0, "Works with sufficient balance");
+    function test_CheckStockMultiplierRange_BuildRejectsMinAboveMax() public {
+        vm.expectRevert(abi.encodeWithSelector(
+            CheckStockMultiplierRange.MaxMultiplierMustBeGreaterThanMinMultiplier.selector,
+            1e18,
+            2e18
+        ));
+        this.buildCheckStockMultiplierRange(address(0), 2e18, 1e18);
+    }
+
+    /**
+     * Test the position is tradable exactly when the multiplier is inside the maker's range
+     */
+    function testFuzz_CheckStockMultiplierRange_TradableIffInRange(
+        uint256 currentMultiplier,
+        uint256 minMultiplier,
+        uint256 maxMultiplier
+    ) public {
+        minMultiplier = bound(minMultiplier, 1, 1e30);
+        maxMultiplier = bound(maxMultiplier, minMultiplier, 1e30);
+        currentMultiplier = bound(currentMultiplier, 0, 1e30);
+
+        StockMultiplier stock = new StockMultiplier(currentMultiplier);
+        ISwapVM.Order memory order = _stockRangeOrder(address(stock), minMultiplier, maxMultiplier);
+
+        if (currentMultiplier >= minMultiplier && currentMultiplier <= maxMultiplier) {
+            assertEq(_executeSwap(order, address(tokenA), address(tokenB), 1e18), 1e18, "In range: tradable");
+        } else {
+            _expectMultiplierOutOfRange(order, address(stock), currentMultiplier, minMultiplier, maxMultiplier);
+        }
     }
 
     /**
@@ -667,6 +778,49 @@ contract ControlsTest is Test, OpcodesDebug {
     }
 
     // Helper functions
+
+    /// @dev Position guarded by a stock multiplier range, priced 1:1 by LimitSwap
+    function _stockRangeOrder(
+        address stock,
+        uint256 minMultiplier,
+        uint256 maxMultiplier
+    ) private view returns (ISwapVM.Order memory) {
+        return _createOrder(bytes.concat(
+            CheckStockMultiplierRange.build(stock, minMultiplier, maxMultiplier),
+            StaticBalances.build(100e18, 100e18),
+            LimitSwap.build(address(tokenA), address(tokenB))
+        ));
+    }
+
+    /// @dev Asserts the swap is rejected by the range check on `stock`
+    function _expectMultiplierOutOfRange(
+        ISwapVM.Order memory order,
+        address stock,
+        uint256 currentMultiplier,
+        uint256 minMultiplier,
+        uint256 maxMultiplier
+    ) private {
+        bytes memory takerData = _signAndPackTakerData(order, true, 0, true);
+        tokenA.mint(taker, 1e18);
+        vm.expectRevert(abi.encodeWithSelector(
+            CheckStockMultiplierRange.CurrentMultiplierIsNotInRange.selector,
+            stock,
+            currentMultiplier,
+            minMultiplier,
+            maxMultiplier
+        ));
+        swapVM.swap(order, 1e18, takerData);
+    }
+
+    /// @dev External boundary so `vm.expectRevert` can observe the builder's own validation
+    function buildCheckStockMultiplierRange(
+        address token,
+        uint256 minMultiplier,
+        uint256 maxMultiplier
+    ) external pure returns (bytes memory) {
+        return CheckStockMultiplierRange.build(token, minMultiplier, maxMultiplier);
+    }
+
     function _buildSimpleSwapWithSalt(uint64 salt) private view returns (bytes memory) {
         return bytes.concat(
             Salt.build(salt),
