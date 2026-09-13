@@ -5,6 +5,7 @@ pragma solidity 0.8.30;
 /// @custom:copyright © 2025 Degensoft Ltd
 
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { IStockMultiplier } from "./interfaces/ITokenizedStocks.sol";
 
 import { Context } from "../libs/VM.sol";
 import { Opcode } from "../libs/OpcodeList.sol";
@@ -110,7 +111,7 @@ library PeggedSwap {
     // ║      NOT suitable for drifting-peg assets where the ratio changes         ║
     // ║      over time without a moving anchor.                                   ║
     // ╚═══════════════════════════════════════════════════════════════════════════╝
-    function exec(Context memory ctx, bytes calldata args) internal pure {
+    function exec(Context memory ctx, bytes calldata args) internal {
         uint256 x0_init;
         uint256 y0_init;
         uint256 linearWidth;
@@ -119,14 +120,29 @@ library PeggedSwap {
         if (ctx.query.tokenIn < ctx.query.tokenOut) (x0_init, y0_init, linearWidth, rateIn, rateOut) = parse(args);
         else (y0_init, x0_init, linearWidth, rateOut, rateIn) = parse(args);
 
+        uint256 token_in_multiplier;
+        uint256 token_out_multiplier;
+        try IStockMultiplier(ctx.query.tokenIn).multiplier() returns (uint256 multiplier) {
+            token_in_multiplier = multiplier;
+        } catch {
+            token_in_multiplier = 1e18;
+        }
+        try IStockMultiplier(ctx.query.tokenOut).multiplier() returns (uint256 multiplier) {
+            token_out_multiplier = multiplier;
+        } catch {
+            token_out_multiplier = 1e18;
+        }
+
         uint256 x0_raw = ctx.swap.balanceIn;
         uint256 y0_raw = ctx.swap.balanceOut;
 
-        // Apply rate multipliers to normalize to common scale (1e18)
-        uint256 x0 = x0_raw * rateIn;
-        uint256 y0 = y0_raw * rateOut;
+        // Apply rate + stock multiplier together in a single mulDiv so precision
+        // isn't lost when rateIn/rateOut = 1 (the common case). Do NOT precompute
+        // an "effective rate" = rate * multiplier / 1e18 — that truncates to 0
+        // whenever rate is 1 and multiplier < 1e18.
+        uint256 x0 = Math.mulDiv(x0_raw * rateIn, token_in_multiplier, 1e18);
+        uint256 y0 = Math.mulDiv(y0_raw * rateOut, token_out_multiplier, 1e18);
 
-        // Calculate target invariant from initial state (using normalized values)
         uint256 targetInvariant = PeggedSwapMath.invariantFromReserves(
             x0,
             y0,
@@ -137,63 +153,46 @@ library PeggedSwap {
 
         if (ctx.query.isExactIn) {
             // ExactIn: calculate y1 from x1 = x0 + amountIn (normalized)
-            uint256 x1 = x0 + ctx.swap.amountIn * rateIn;
+            uint256 x1 = x0 + Math.mulDiv(ctx.swap.amountIn * rateIn, token_in_multiplier, 1e18);
 
-            // Solve for y1: given x1, find y1 that maintains invariant
-            // x1 * ONE / x0 - safe: x1 ≤ 1e30, ONE = 1e27 → 1e57 < 1e77
             uint256 u1 = x1 * PeggedSwapMath.ONE / x0_init;  // Round DOWN u1
 
-            // u-side invariant contribution: √u1 + a·u1
-            // a * u1 / ONE - safe: a ≤ 2e27, u1 ≤ 2e27 → 4e54 < 1e77
             uint256 invariantU1 = Math.sqrt(u1 * PeggedSwapMath.ONE) + linearWidth * u1 / PeggedSwapMath.ONE;
 
-            // Capacity check without a dedicated solve(uMax):
-            // g(u) = √u + a·u is strictly increasing and g(uMax) = targetInvariant,
-            // so u1 >= uMax  ⟺  invariantU1 >= targetInvariant  ⟺  solve(u1) has no solution.
-            // This avoids solving for uMax on the common path; we only pay for it on drain.
             if (invariantU1 >= targetInvariant) {
-                // Input exceeds capacity (v would be ≤ 0): drain output reserve, recompute amountIn.
-                // Cap x1 at uMax (v=0 → rightSide = targetInvariant), round UP (protects maker)
                 uint256 uMax = PeggedSwapMath.solve(targetInvariant, linearWidth);
                 uint256 x1Capped = Math.ceilDiv(uMax * x0_init, PeggedSwapMath.ONE);
 
-                ctx.swap.amountIn = Math.ceilDiv(x1Capped - x0, rateIn);
+                // amountIn = (x1Capped - x0) / (rateIn * multiplier / 1e18)
+                //          = (x1Capped - x0) * 1e18 / (rateIn * multiplier), rounded UP (protects maker)
+                ctx.swap.amountIn = Math.ceilDiv((x1Capped - x0) * 1e18, rateIn * token_in_multiplier);
                 ctx.swap.amountOut = y0_raw; // drain output reserve
             } else {
                 uint256 rightSide = targetInvariant - invariantU1;
                 uint256 v1 = PeggedSwapMath.solve(rightSide, linearWidth);
 
-                // Round UP y1 (normalized) to ensure amountOut rounds DOWN (protects maker)
-                // v1 * y0 - safe: v1 ≤ 2e27, y0 ≤ 1e27 → 2e54 < 1e77
                 uint256 y1 = Math.ceilDiv(v1 * y0_init, PeggedSwapMath.ONE);
 
-                // Convert back from normalized scale: amountOut = (y0 - y1) / rateOut
-                // Round DOWN to protect maker
-                ctx.swap.amountOut = (y0 - y1) / rateOut;
+                // amountOut = (y0 - y1) / (rateOut * multiplier / 1e18), rounded DOWN (protects maker)
+                ctx.swap.amountOut = Math.mulDiv(y0 - y1, 1e18, rateOut * token_out_multiplier);
             }
         } else {
             if (ctx.swap.amountOut > y0_raw) ctx.swap.amountOut = y0_raw;
 
             // ExactOut: calculate x1 from y1 = y0 - amountOut (normalized)
-            uint256 y1 = y0 - ctx.swap.amountOut * rateOut;
+            uint256 y1 = y0 - Math.mulDiv(ctx.swap.amountOut * rateOut, token_out_multiplier, 1e18);
 
-            // Solve for x1: given y1, find x1 that maintains invariant
-            // y1 * ONE / y0 - safe: y1 ≤ 1e30, ONE = 1e27 → 1e57 < 1e77
             uint256 v1 = y1 * PeggedSwapMath.ONE / y0_init;  // Round DOWN v1
 
             uint256 invariantV1 = Math.sqrt(v1 * PeggedSwapMath.ONE) + linearWidth * v1 / PeggedSwapMath.ONE;
             require(targetInvariant >= invariantV1, PeggedSwapMath.PeggedSwapMathInvalidInput());
             uint256 u1 = PeggedSwapMath.solve(targetInvariant - invariantV1, linearWidth);
 
-            // Round UP x1 (normalized) to ensure amountIn rounds UP (protects maker)
-            // u1 * x0_init - safe: u1 ≤ u* ≤ 4e27 (boundary for any A ≥ 0), x0_init ≤ 1e30 → 4e57 < 1e77
             uint256 x1 = Math.ceilDiv(u1 * x0_init, PeggedSwapMath.ONE);
 
-            // Convert back from normalized scale: amountIn = (x1 - x0) / rateIn
-            // Round UP to protect maker
-            uint256 amountIn = Math.ceilDiv(x1 - x0, rateIn);
+            // amountIn = (x1 - x0) / (rateIn * multiplier / 1e18), rounded UP (protects maker)
+            uint256 amountIn = Math.ceilDiv((x1 - x0) * 1e18, rateIn * token_in_multiplier);
 
-            // least 1 wei of tokenIn for any nonzero output (maker-favorable, matches the ceilDiv intent).
             if (amountIn == 0 && ctx.swap.amountOut != 0) {
                 amountIn = 1;
             }
